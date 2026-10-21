@@ -1,0 +1,39 @@
+## [Build Results]
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+## [Visual Studio / Rider / VS Code]
+.vs/
+.idea/
+.vscode/
+*.DotSettings.user
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+## [macOS]
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+## [Database / Local DB]
+*.mdf
+*.ldf
+*.ndf
+
+## [Secrets & Environment]
+appsettings.*.local.json
