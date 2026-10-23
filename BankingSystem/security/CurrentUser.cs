@@ -21,8 +21,13 @@ public class CurrentUser : ICurrentUser
         }
     }
 
-    public string? PhoneNumber => _accessor.HttpContext?.User?.FindFirstValue(ClaimTypes.MobilePhone);
-    public string? Role => _accessor.HttpContext?.User?.FindFirstValue(ClaimTypes.Role);
+    public string? PhoneNumber => _accessor.HttpContext?.User?.FindFirstValue(ClaimTypes.MobilePhone)
+                                 ?? _accessor.HttpContext?.User?.FindFirstValue("phone")
+                                 ?? _accessor.HttpContext?.User?.FindFirstValue("mobilephone");
+
+    public string? Role => _accessor.HttpContext?.User?.FindFirstValue(ClaimTypes.Role)
+                           ?? _accessor.HttpContext?.User?.FindFirstValue("role");
+
     public bool IsAuthenticated => _accessor.HttpContext?.User?.Identity?.IsAuthenticated ?? false;
     public string? IpAddress => _accessor.HttpContext?.Connection?.RemoteIpAddress?.ToString();
     public string? UserAgent => _accessor.HttpContext?.Request?.Headers["User-Agent"].ToString();
