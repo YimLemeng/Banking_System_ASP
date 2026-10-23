@@ -13,7 +13,7 @@ public class User
     public bool EmailConfirmed { get; set; }
     public string PasswordHash { get; set; } = string.Empty;
     public string FullName { get; set; } = string.Empty;
-    public UserRole Role { get; set; } = UserRole.Customer;
+    public UserRole Role { get; set; } = UserRole.Teller;
     public UserStatus Status { get; set; } = UserStatus.Active;
     public int FailedLoginCount { get; set; }
     public DateTimeOffset? LockoutEnd { get; set; }
@@ -28,7 +28,7 @@ public class User
         PhoneNumber phoneNumber,
         string passwordHash,
         string fullName,
-        UserRole role = UserRole.Customer,
+        UserRole role = UserRole.Teller,
         string? email = null)
     {
         return new User

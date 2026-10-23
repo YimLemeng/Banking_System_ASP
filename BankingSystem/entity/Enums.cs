@@ -2,9 +2,8 @@ namespace BankingSystem.entity;
 
 public enum UserRole
 {
-    Customer = 1,
-    Teller = 2,
-    Admin = 3
+    Teller = 1,
+    Admin = 2
 }
 
 public enum UserStatus

@@ -12,6 +12,16 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Serilog;
 
+// Load .env configuration if present (traverses parent directories)
+try
+{
+    DotNetEnv.Env.TraversePath().Load();
+}
+catch
+{
+    // Ignore if not present or cannot traverse
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 // 1. Structured Logging with Serilog
@@ -31,11 +41,17 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddAutoMapper(typeof(AutoMapperProfile));
 
 // Options Pattern
-builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
+builder.Services.Configure<JwtOptions>(options =>
+{
+    builder.Configuration.GetSection(JwtOptions.SectionName).Bind(options);
+    var envSecret = Environment.GetEnvironmentVariable("JWT_SECRET");
+    if (!string.IsNullOrWhiteSpace(envSecret)) options.SecretKey = envSecret;
+});
 builder.Services.Configure<OtpOptions>(builder.Configuration.GetSection(OtpOptions.SectionName));
 
 // Database Context
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+var connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION")
+                       ?? builder.Configuration.GetConnectionString("DefaultConnection")
                        ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -71,6 +87,11 @@ builder.Services.AddHostedService<OtpCleanupService>();
 
 // JWT Authentication
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
+var envJwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET");
+if (!string.IsNullOrWhiteSpace(envJwtSecret))
+{
+    jwtOptions.SecretKey = envJwtSecret;
+}
 if (string.IsNullOrWhiteSpace(jwtOptions.SecretKey) || jwtOptions.SecretKey.Length < 32)
 {
     jwtOptions.SecretKey = "EnterpriseBankingSystemUltraSecureSecretKeyForJwt2026!LongEnoughForSha256";
@@ -188,7 +209,6 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var context = services.GetRequiredService<AppDbContext>();
-        var hasher = services.GetRequiredService<IPasswordHasher>();
 
         if (context.Database.IsRelational())
         {
@@ -198,12 +218,10 @@ using (var scope = app.Services.CreateScope())
         {
             await context.Database.EnsureCreatedAsync();
         }
-
-        await DbInitializer.SeedAsync(context, hasher, logger);
     }
     catch (Exception ex)
     {
-        logger.LogWarning(ex, "Automated database migration/seed skipped on startup. Run 'dotnet ef database update' manually.");
+        logger.LogWarning(ex, "Automated database migration skipped on startup. Run 'dotnet ef database update' manually.");
     }
 }
 

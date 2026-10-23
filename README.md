@@ -4,7 +4,7 @@
 
 ```
 BankingSystem/
-├── config/             # DbContext, Entity Configurations, EF Migrations, DbInitializer, Options
+├── config/             # DbContext, Entity Configurations, EF Migrations, Options
 ├── controller/         # AuthController, AccountsController, TransactionsController, CustomersController, AuditLogsController
 ├── dto/                # Request & Response DTOs, Unified ApiResponse<T>, PagedResult<T>
 ├── entity/             # User, RefreshToken, Customer, Account, Transaction, OtpCode, AuditLog, PhoneNumber, Enums

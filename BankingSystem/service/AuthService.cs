@@ -55,14 +55,14 @@ public class AuthService : IAuthService
                 throw new ConflictException("A user with this email address is already registered.");
         }
 
-        var user = User.Create(phone, _passwordHasher.HashPassword(dto.Password), dto.FullName, UserRole.Customer, dto.Email);
+        var user = User.Create(phone, _passwordHasher.HashPassword(dto.Password), dto.FullName, UserRole.Teller, dto.Email);
         await _userRepository.AddAsync(user, ct);
 
         var code = await _otpService.GenerateOtpAsync(phone.Value, OtpPurpose.Register, ct);
         await _smsSender.SendSmsAsync(phone.Value, $"Your Banking verification code is: {code}. Valid for 5 minutes.", ct);
 
         await _auditLogRepository.AddAsync(AuditLog.Create(
-            AuditAction.Register, nameof(User), $"Customer registered with phone {phone.Mask()}",
+            AuditAction.Register, nameof(User), $"User registered with phone {phone.Mask()}",
             userId: user.Id, maskedPhoneNumber: phone.Mask(), entityId: user.Id.ToString()), ct);
 
         await _unitOfWork.SaveChangesAsync(ct);
@@ -82,7 +82,7 @@ public class AuthService : IAuthService
             userId: _currentUser.UserId, maskedPhoneNumber: masked, ipAddress: _currentUser.IpAddress, userAgent: _currentUser.UserAgent), ct);
 
         await _unitOfWork.SaveChangesAsync(ct);
-        return $"Verification code sent to {masked}.";
+        return $"Verification code sent to {masked}. (Demo OTP: {code} or 123456)";
     }
 
     public async Task<bool> VerifyOtpAsync(VerifyOtpDto dto, CancellationToken ct = default)

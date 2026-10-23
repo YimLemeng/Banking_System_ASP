@@ -36,4 +36,7 @@ Icon
 *.ndf
 
 ## [Secrets & Environment]
+.env
+.env.*
+!.env.example
 appsettings.*.local.json
