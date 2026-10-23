@@ -4,7 +4,6 @@ using BankingSystem.config;
 using BankingSystem.entity;
 using BankingSystem.exception;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace BankingSystem.security;

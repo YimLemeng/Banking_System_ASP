@@ -71,6 +71,10 @@ builder.Services.AddHostedService<OtpCleanupService>();
 
 // JWT Authentication
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
+if (string.IsNullOrWhiteSpace(jwtOptions.SecretKey) || jwtOptions.SecretKey.Length < 32)
+{
+    jwtOptions.SecretKey = "EnterpriseBankingSystemUltraSecureSecretKeyForJwt2026!LongEnoughForSha256";
+}
 var key = Encoding.UTF8.GetBytes(jwtOptions.SecretKey);
 
 builder.Services.AddAuthentication(options =>
