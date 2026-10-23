@@ -63,6 +63,19 @@ public class AccountService : IAccountService
         return _mapper.Map<AccountDto>(account);
     }
 
+    public async Task<AccountDto> GetByAccountNumberAsync(string accountNumber, CancellationToken ct = default)
+    {
+        var account = await _accountRepository.GetByAccountNumberAsync(accountNumber, ct);
+        if (account == null) throw new NotFoundException($"Account '{accountNumber}' not found.");
+        return _mapper.Map<AccountDto>(account);
+    }
+
+    public async Task<IReadOnlyList<AccountDto>> GetAllAsync(CancellationToken ct = default)
+    {
+        var accounts = await _accountRepository.GetAllAsync(ct);
+        return _mapper.Map<IReadOnlyList<AccountDto>>(accounts);
+    }
+
     public async Task<IReadOnlyList<AccountDto>> GetByCustomerIdAsync(Guid customerId, CancellationToken ct = default)
     {
         var accounts = await _accountRepository.GetByCustomerIdAsync(customerId, ct);

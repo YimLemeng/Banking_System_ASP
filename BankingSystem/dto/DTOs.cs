@@ -113,7 +113,8 @@ public record CustomerDto(
     IReadOnlyList<AccountDto>? Accounts = null);
 
 public record CreateCustomerRequestDto(
-    Guid UserId,
+    Guid? UserId,
+    string? PhoneNumber,
     string FirstName,
     string LastName,
     DateTime DateOfBirth,

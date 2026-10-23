@@ -23,6 +23,14 @@ public class CustomersController : ApiControllerBase
         return Ok(ApiResponse<CustomerDto>.Ok(result, "Customer profile created successfully."));
     }
 
+    [HttpGet]
+    [Authorize(Roles = "Admin,Teller")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<CustomerDto>>>> GetAll(CancellationToken ct)
+    {
+        var result = await _customerService.GetAllAsync(ct);
+        return Ok(ApiResponse<IReadOnlyList<CustomerDto>>.Ok(result));
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ApiResponse<CustomerDto>>> GetById(Guid id, CancellationToken ct)
     {

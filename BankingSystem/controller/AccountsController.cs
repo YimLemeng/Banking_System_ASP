@@ -23,6 +23,22 @@ public class AccountsController : ApiControllerBase
         return Ok(ApiResponse<AccountDto>.Ok(result, "Account opened successfully."));
     }
 
+    [HttpGet]
+    [Authorize(Roles = "Admin,Teller")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<AccountDto>>>> GetAll(CancellationToken ct)
+    {
+        var result = await _accountService.GetAllAsync(ct);
+        return Ok(ApiResponse<IReadOnlyList<AccountDto>>.Ok(result));
+    }
+
+    [HttpGet("number/{accountNumber}")]
+    [Authorize(Roles = "Admin,Teller")]
+    public async Task<ActionResult<ApiResponse<AccountDto>>> GetByAccountNumber(string accountNumber, CancellationToken ct)
+    {
+        var result = await _accountService.GetByAccountNumberAsync(accountNumber, ct);
+        return Ok(ApiResponse<AccountDto>.Ok(result));
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ApiResponse<AccountDto>>> GetById(Guid id, CancellationToken ct)
     {
