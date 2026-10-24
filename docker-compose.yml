@@ -20,7 +20,7 @@ services:
       - MSSQL_SA_PASSWORD=${MSSQL_SA_PASSWORD:-YourSecurePassword123!}
       - MSSQL_PID=Developer
     ports:
-      - "1433:1433"
+      - "${MSSQL_PORT:-1434}:1433"
     volumes:
       - sqlserver_data:/var/opt/mssql
     healthcheck:

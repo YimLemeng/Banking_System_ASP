@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text;
 using System.Text.Json.Serialization;
 using BankingSystem.config;
+using BankingSystem.entity;
 using BankingSystem.exception;
 using BankingSystem.mapper;
 using BankingSystem.repository;
@@ -221,6 +222,24 @@ using (var scope = app.Services.CreateScope())
         else
         {
             await context.Database.EnsureCreatedAsync();
+        }
+
+        // Automatic Seeding for Initial Startup
+        if (!await context.Users.AnyAsync())
+        {
+            logger.LogInformation("Seeding initial administrator and teller accounts...");
+            var passwordHasher = services.GetRequiredService<IPasswordHasher>();
+            var totpService = services.GetRequiredService<ITotpService>();
+
+            var admin = User.Create("admin", passwordHasher.HashPassword("Admin@123!"), "System Administrator", UserRole.Admin, "admin@bankingsystem.com");
+            admin.EnableTotp(totpService.GenerateSecretKey());
+
+            var teller = User.Create("teller", passwordHasher.HashPassword("Teller@123!"), "Branch Head Teller", UserRole.Teller, "teller@bankingsystem.com");
+            teller.EnableTotp(totpService.GenerateSecretKey());
+
+            await context.Users.AddRangeAsync(admin, teller);
+            await context.SaveChangesAsync();
+            logger.LogInformation("Initial accounts seeded successfully.");
         }
     }
     catch (Exception ex)

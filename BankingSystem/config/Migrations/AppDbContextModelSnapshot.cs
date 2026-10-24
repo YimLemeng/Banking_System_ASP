@@ -53,7 +53,8 @@ namespace BankingSystem.config.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<decimal>("InterestRate")
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
@@ -170,7 +171,12 @@ namespace BankingSystem.config.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<Guid>("UserId")
+                    b.Property<string>("PhoneNumber")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid?>("UserId")
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
@@ -178,8 +184,11 @@ namespace BankingSystem.config.Migrations
                     b.HasIndex("CustomerNumber")
                         .IsUnique();
 
+                    b.HasIndex("PhoneNumber");
+
                     b.HasIndex("UserId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[UserId] IS NOT NULL");
 
                     b.ToTable("Customers", (string)null);
                 });
@@ -214,47 +223,6 @@ namespace BankingSystem.config.Migrations
                         .IsUnique();
 
                     b.ToTable("IdempotentRequests", (string)null);
-                });
-
-            modelBuilder.Entity("BankingSystem.entity.OtpCode", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("Attempts")
-                        .HasColumnType("int");
-
-                    b.Property<string>("CodeHash")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<DateTimeOffset>("ExpiresAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<bool>("IsUsed")
-                        .HasColumnType("bit");
-
-                    b.Property<DateTimeOffset?>("LockoutEnd")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("PhoneNumber")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<int>("Purpose")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PhoneNumber", "Purpose", "ExpiresAt");
-
-                    b.ToTable("OtpCodes", (string)null);
                 });
 
             modelBuilder.Entity("BankingSystem.entity.RefreshToken", b =>
@@ -391,24 +359,25 @@ namespace BankingSystem.config.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
-                    b.Property<string>("PhoneNumber")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<bool>("PhoneNumberConfirmed")
-                        .HasColumnType("bit");
-
                     b.Property<int>("Role")
                         .HasColumnType("int");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
-                    b.HasKey("Id");
+                    b.Property<bool>("TotpEnabled")
+                        .HasColumnType("bit");
 
-                    b.HasIndex("PhoneNumber")
-                        .IsUnique();
+                    b.Property<string>("TotpSecretKey")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
 
                     b.ToTable("Users", (string)null);
                 });
@@ -429,8 +398,7 @@ namespace BankingSystem.config.Migrations
                     b.HasOne("BankingSystem.entity.User", "User")
                         .WithOne()
                         .HasForeignKey("BankingSystem.entity.Customer", "UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("User");
                 });
