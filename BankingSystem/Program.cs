@@ -45,12 +45,21 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddAutoMapper(typeof(AutoMapperProfile));
 
-// Options Pattern
+// Options Pattern & Security Configuration
+var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET")
+                ?? builder.Configuration["Jwt:SecretKey"];
+
+if (string.IsNullOrWhiteSpace(jwtSecret)
+    || jwtSecret.Length < 32
+    || jwtSecret == "YOUR_SECRET_KEY_MINIMUM_32_CHARACTERS_LONG_FOR_SHA256_IN_PRODUCTION")
+{
+    throw new InvalidOperationException("FATAL: JWT SecretKey is not configured. Please set a secure JWT_SECRET (minimum 32 characters) in your .env file or hosting environment.");
+}
+
 builder.Services.Configure<JwtOptions>(options =>
 {
     builder.Configuration.GetSection(JwtOptions.SectionName).Bind(options);
-    var envSecret = Environment.GetEnvironmentVariable("JWT_SECRET");
-    if (!string.IsNullOrWhiteSpace(envSecret)) options.SecretKey = envSecret;
+    options.SecretKey = jwtSecret;
 });
 builder.Services.Configure<OtpOptions>(builder.Configuration.GetSection(OtpOptions.SectionName));
 
@@ -90,15 +99,7 @@ builder.Services.AddScoped<ICustomerService, CustomerService>();
 
 // JWT Authentication
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
-var envJwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET");
-if (!string.IsNullOrWhiteSpace(envJwtSecret))
-{
-    jwtOptions.SecretKey = envJwtSecret;
-}
-if (string.IsNullOrWhiteSpace(jwtOptions.SecretKey) || jwtOptions.SecretKey.Length < 32)
-{
-    jwtOptions.SecretKey = "EnterpriseBankingSystemUltraSecureSecretKeyForJwt2026!LongEnoughForSha256";
-}
+jwtOptions.SecretKey = jwtSecret;
 var key = Encoding.UTF8.GetBytes(jwtOptions.SecretKey);
 
 builder.Services.AddAuthentication(options =>

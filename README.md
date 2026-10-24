@@ -1,97 +1,142 @@
 # Enterprise Banking System Web API (.NET 8)
 
-គម្រោង Banking System Web API ត្រូវបានរៀបចំឡើងតាមរចនាសម្ព័ន្ធ Layered Architecture ក្នុង Project តែមួយ (Single-Project Layered Structure) ដូចទៅនឹងគម្រោងស្ដង់ដារដែលបានកំណត់៖
+[![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
+[![ASP.NET Core](https://img.shields.io/badge/ASP.NET_Core-Web_API-512BD4)](https://dotnet.microsoft.com/apps/aspnet)
+[![SQL Server](https://img.shields.io/badge/Database-SQL_Server-CC292B?logo=microsoftsqlserver&logoColor=white)](https://www.microsoft.com/sql-server)
+[![JWT Authentication](https://img.shields.io/badge/Auth-JWT_%2B_TOTP_2FA-000000?logo=jsonwebtokens)](https://jwt.io/)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+ប្រព័ន្ធធនាគារកម្រិតសហគ្រាស (Enterprise Banking System Web API) បង្កើតឡើងដោយប្រើប្រាស់ **ASP.NET Core .NET 8** ជាមួយ **Clean Architecture & Repository Pattern** ផ្តោតសំខាន់លើសុវត្ថិភាពខ្ពស់ គ្មាន Hardcoded Secrets និងគាំទ្រស្តង់ដារធនាគារពេញលេញ។
+
+---
+
+## 🏛️ រចនាសម្ព័ន្ធគម្រោង (Architecture & Directory Structure)
+
+គម្រោងត្រូវបានរៀបចំឡើងយ៉ាងមានរបៀបរៀបរយក្នុង Layered Structure ៖
 
 ```
 BankingSystem/
-├── config/             # DbContext, Entity Configurations, EF Migrations, Options
-├── controller/         # AuthController, AccountsController, TransactionsController, CustomersController, AuditLogsController
+├── config/             # DbContext, Entity Configurations, EF Core Migrations, Options
+├── controller/         # RESTful API Controllers (Auth, Accounts, Transactions, Customers, Users, AuditLogs)
 ├── dto/                # Request & Response DTOs, Unified ApiResponse<T>, PagedResult<T>
-├── entity/             # User, RefreshToken, Customer, Account, Transaction, OtpCode, AuditLog, PhoneNumber, Enums
-├── exception/          # Custom Exceptions & RFC 7807 GlobalExceptionHandlerMiddleware
-├── mapper/             # AutoMapper Profile
+├── entity/             # User, RefreshToken, Customer, Account, Transaction, OtpCode, AuditLog, Enums
+├── exception/          # Custom Domain Exceptions & RFC 7807 GlobalExceptionHandlerMiddleware
+├── mapper/             # AutoMapper Profiles
 ├── repository/         # GenericRepository, UserRepository, AccountRepository, TransactionRepository, UnitOfWork
-├── security/           # BCrypt PasswordHasher, JwtTokenService, OtpService, CurrentUser accessor
-├── service/            # AuthService, AccountService, TransactionService, CustomerService, SmsSender, OtpCleanupService
-├── Program.cs          # Pipeline, Serilog, Swagger UI, JWT Bearer, CORS, Database Migration & Seeding
-├── appsettings.json    # SQL Server Connection, JWT Settings, OTP Rate Limits
+├── security/           # BCrypt PasswordHasher, JwtTokenService, TotpService, CurrentUser context
+├── service/            # AuthService, AccountService, TransactionService, CustomerService, OtpCleanupService
+├── Program.cs          # Pipeline, Serilog, Swagger UI, JWT Bearer, CORS, Environment Loader
+├── appsettings.json    # Base application configurations (Secrets are loaded from .env)
 └── BankingSystem.csproj
+```
+
+---
+
+## 🔒 សុវត្ថិភាព និងការគ្រប់គ្រង Secrets (Security & Environment)
+
+> [!IMPORTANT]
+> **Zero Hardcoded Secrets Policy**:
+> គ្រប់ Secret Keys, JWT Signing Keys និង Database Connection Strings ត្រូវបានផ្ទុកនៅក្នុង file `.env` ក្នុងម៉ាស៊ីនផ្ទាល់តែប៉ុណ្ណោះ។ File `.env` ត្រូវបាន Ignore ដោយ `.gitignore` មិនត្រូវបាន Push ចូល GitHub ដាច់ខាត។
+
+### បង្កើតឯកសារ `.env` (Environment Setup)
+ចម្លង file គំរូ `.env.example` ទៅជា `.env` ៖
+```bash
+cp .env.example .env
+```
+
+កែប្រែតម្លៃនៅក្នុង file `.env` ៖
+```dotenv
+# Database Connection (SQL Server)
+DB_CONNECTION="Server=localhost,1433;Database=banking_system_db;User Id=sa;Password=YourSecurePassword123!;TrustServerCertificate=True;MultipleActiveResultSets=true"
+ConnectionStrings__DefaultConnection="Server=localhost,1433;Database=banking_system_db;User Id=sa;Password=YourSecurePassword123!;TrustServerCertificate=True;MultipleActiveResultSets=true"
+
+# JWT Secret Key (Must be at least 32 characters for HMAC-SHA256)
+JWT_SECRET="YourUltraSecureSecretKeyForJwt2026Minimum32Characters!"
+Jwt__SecretKey="YourUltraSecureSecretKeyForJwt2026Minimum32Characters!"
 ```
 
 ---
 
 ## 🚀 មុខងារចម្បងៗ (Core Features)
 
-1. **Authentication & Authorization (Phone Number Required)**:
-   - ចុះឈ្មោះដោយប្រើលេខទូរស័ព្ទ (E.164 Cambodia format `+855...`) និង Password
-   - Login តាមរយៈ លេខទូរស័ព្ទ + Password
-   - Login តាមរយៈ លេខទូរស័ព្ទ + OTP (Passwordless via SMS)
-   - Fallback Login តាមរយៈ Email + Password
-   - Rotating Refresh Token និង Logout (Revoke Token)
+1. **Authentication & Multi-Factor Security (TOTP 2FA)**:
+   - Login តាមរយៈ **Username + Password**
+   - គាំទ្រ **TOTP 2FA Authenticator** (Google Authenticator, Microsoft Authenticator) តាមរយៈ Base64 QR Code & Secret Key
+   - JWT Access Token (HMAC-SHA256) រួមជាមួយ Rotating Refresh Token
    - Lockout រយៈពេល 15 នាទី ប្រសិនបើវាយ Password ខុសលើសពី 5 ដង
-2. **Cryptographic OTP Security Rules**:
-   - បង្កើតលេខកូដសម្ងាត់ 6 ខ្ទង់ដោយប្រើ `RandomNumberGenerator`
-   - រក្សាទុកតែតម្លៃ SHA-256 Hash នៅក្នុង Database (មិនរក្សាទុក Plaintext ដាច់ខាត)
-   - សុពលភាព 5 នាទី, ប្រើបានតែ 1 ដង (Single use)
-   - Cooldown 60 វិនាទី រវាងការស្នើសុំកូដម្តងៗ, អនុញ្ញាតអតិបរមា 5 ដងក្នុង 1 ម៉ោង
-   - វាយកូដខុសលើសពី 5 ដង នឹង Lockout រយៈពេល 15 នាទី
-   - Background service សម្អាត OTP ដែលផុតកំណត់រៀងរាល់ 1 ម៉ោង
-3. **Account & Core Banking**:
-   - ប្រភេទគណនី៖ Savings, Checking, Fixed Deposit
-   - រូបិយប័ណ្ណ៖ **USD** និង **KHR** (ទសភាគ `decimal(18,2)`)
-   - ប្រតិបត្តិការ Deposit និង Withdraw ដោយមានការពារ Idempotency Key
-   - ការផ្ទេរប្រាក់ (Transfer) ស្ថិតក្នុង Database Transaction ធានា ACID
-   - Optimistic Concurrency តាមរយៈ SQL Server `RowVersion`
-   - ផ្ទេរប្រាក់ចាប់ពី $1,000 USD ឬ 4,000,000 KHR ឡើងទៅ តម្រូវឱ្យផ្ទៀងផ្ទាត់ 2FA OTP
-   - បង្កក (Freeze), ដោះបង្កក (Unfreeze), និងបិទគណនី (Close Account - សមតុល្យត្រូវតែស្មើ 0)
+2. **Account Management (Core Banking)**:
+   - ប្រភេទគណនី៖ **Savings**, **Checking**, **Fixed Deposit**
+   - រូបិយប័ណ្ណ៖ **USD** ($) និង **KHR** (៛) ដោយប្រើប្រាស់ `decimal(18,2)` ធានាតម្លៃជាក់លាក់
+   - បង្កក (Freeze), ដោះបង្កក (Unfreeze), និងបិទគណនី (Close Account)
+3. **Financial Transactions & ACID Compliance**:
+   - ប្រតិបត្តិការ **Deposit (ដាក់ប្រាក់)** និង **Withdraw (ដកប្រាក់)**
+   - ប្រតិបត្តិការ **Transfer (ផ្ទេរប្រាក់)** ដំណើរការក្នុង EF Core Database Transaction ដោយធានា ACID 100%
+   - ការពារការកាត់ប្រាក់ស្ទួនដោយស្វ័យប្រវត្តិតាមរយៈ **Idempotency Key**
    - ទាញយករបាយការណ៍គណនី (Account Statement) និងប្រវត្តិប្រតិបត្តិការ
-4. **Audit Trail**:
-   - កត់ត្រារាល់សកម្មភាពសំខាន់ៗទាំងអស់ (Login, OTP, Transfer, Deposit, Withdraw, Freeze) ព្រមទាំង Mask លេខទូរស័ព្ទ (`+855****5680`)
+4. **Customer KYC & Staff Directory**:
+   - Customer Onboarding ជាមួយ KYC Status (Pending, Verified, Rejected)
+   - Endpoint សម្រាប់ Admin ពិនិត្យបញ្ជីឈ្មោះបុគ្គលិក និងអ្នកគ្រប់គ្រង (`/api/v1/users`)
+5. **Security Audit Trail**:
+   - កត់ត្រារាល់សកម្មភាពសំខាន់ៗទាំងអស់ (Login, Transfer, Freeze, Password Change)
+   - ការពារឯកជនភាពដោយ Mask ព័ត៌មានរសើប និង IP Address
 
 ---
 
 ## 🛠️ របៀបតម្លើង និងដំណើរការ (Run & Setup)
 
-### 1. Build គម្រោង
+### 1. Requirements
+- [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [Microsoft SQL Server](https://www.microsoft.com/sql-server) (Local ឬ Docker)
+
+### 2. Build គម្រោង
 ```bash
 dotnet restore
 dotnet build
 ```
 
-### 2. Run Database Migration ទៅកាន់ SQL Server
-> [!NOTE]
-> ប្រសិនបើ Terminal របស់អ្នកកំពុងស្ថិតនៅក្នុង folder **`BankingSystem`** ស្រាប់ (ដូចក្នុង JetBrains Rider/VS Code):
-> ```bash
-> dotnet ef database update
-> ```
-> ប៉ុន្តែប្រសិនបើស្ថិតនៅ root folder ខាងក្រៅ (`Banking-system`):
-> ```bash
-> dotnet ef database update --project BankingSystem
-> ```
-
-### 3. Run Web API
-> ប្រសិនបើនៅក្នុង folder **`BankingSystem`**:
-> ```bash
-> dotnet run
-> ```
-> ប្រសិនបើស្ថិតនៅ root folder ខាងក្រៅ:
-> ```bash
-> dotnet run --project BankingSystem
-> ```
-- Swagger UI នឹងបើកនៅ: `https://localhost:7189` (ឬ `http://localhost:5000`)
-
-### 4. ដំណើរការ Unit Tests
+### 3. Run Database Migrations
+ប្រសិនបើ Terminal ស្ថិតនៅក្នុង folder `BankingSystem`:
 ```bash
-dotnet test
+dotnet ef database update
 ```
-*(Tests ទាំងអស់ចំនួន 32 tests ដំណើរការជោគជ័យ 100%)*
+ឬប្រសិនបើ Terminal ស្ថិតនៅ root folder (`Banking-system`):
+```bash
+dotnet ef database update --project BankingSystem
+```
+
+### 4. ដំណើរការ Web API
+```bash
+cd BankingSystem
+dotnet run --urls=http://localhost:5107
+```
+- API Base URL: `http://localhost:5107`
+- Swagger UI Documentation: `http://localhost:5107/swagger`
 
 ---
 
-## 👤 គណនីគំរូដែលបាន Seed ក្នុង Database
+## 👤 គណនីគំរូសម្រាប់តេស្ត (Default Demo Accounts)
 
-| តួនាទី (Role) | លេខទូរស័ព្ទ | Password | សម្គាល់ |
+| Username | Role | Password | មុខងារ (Capabilities) |
 |---|---|---|---|
-| **Admin** | `012345678` (ឬ `+85512345678`) | `Admin@123!` | System Administrator |
-| **Teller** | `012345679` (ឬ `+85512345679`) | `Teller@123!` | Branch Head Teller |
+| **admin** | `Admin` | `Admin@123!` | គ្រប់គ្រងបុគ្គលិក, មើល Audit Logs, Freeze Account, Full Access |
+| **teller** | `Teller` | `Teller@123!` | Onboard Customer, បើកគណនី, ដាក់/ដក/ផ្ទេរប្រាក់, KYC Check |
 
+---
+
+## 📡 API Endpoints Overview
+
+| Method | Endpoint | Role Required | បរិយាយ (Description) |
+|---|---|---|---|
+| `POST` | `/api/v1/auth/login/pre-check` | Anonymous | ផ្ទៀងផ្ទាត់ Username & Password និងបង្កើត TOTP Setup |
+| `POST` | `/api/v1/auth/login/totp` | Anonymous | បញ្ចូលលេខកូដ 6 ខ្ទង់ Authenticator ដើម្បីទទួល JWT Token |
+| `POST` | `/api/v1/auth/refresh-token` | Anonymous | ផ្លាស់ប្តូរ Token ថ្មីដោយប្រើ Refresh Token |
+| `POST` | `/api/v1/auth/logout` | Authenticated | ចាកចេញ និងលុប Refresh Token |
+| `GET` | `/api/v1/users` | `Admin` | បង្ហាញបញ្ជីឈ្មោះបុគ្គលិក និង Admin |
+| `GET` | `/api/v1/customers` | `Admin, Teller` | បង្ហាញបញ្ជីអតិថិជន និងព័ត៌មាន KYC |
+| `POST` | `/api/v1/customers` | `Admin, Teller` | ចុះឈ្មោះអតិថិជនថ្មី |
+| `GET` | `/api/v1/accounts` | `Admin, Teller` | បង្ហាញបញ្ជីគណនីធនាគារទាំងអស់ |
+| `POST` | `/api/v1/accounts` | `Admin, Teller` | បង្កើតគណនីធនាគារថ្មី (Savings/Checking/Fixed) |
+| `POST` | `/api/v1/transactions/deposit` | `Admin, Teller` | ដាក់ប្រាក់ចូលគណនី |
+| `POST` | `/api/v1/transactions/withdraw` | `Admin, Teller` | ដកប្រាក់ពីគណនី |
+| `POST` | `/api/v1/transactions/transfer` | `Admin, Teller` | ផ្ទេរប្រាក់រវាងគណនី (ACID Transaction) |
+| `GET` | `/api/v1/audit-logs` | `Admin` | ពិនិត្យមើល System Audit Trails |
