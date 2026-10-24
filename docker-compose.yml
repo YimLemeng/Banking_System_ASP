@@ -1,0 +1,84 @@
+# ==============================================================================
+# Enterprise Banking System - Full Stack Multi-Container Orchestration
+# ==============================================================================
+# Services:
+#   1. sqlserver - Microsoft SQL Server 2022 (Database)
+#   2. backend   - ASP.NET Core .NET 8 Web API
+#   3. frontend  - React + Vite + Tailwind CSS (Served via Nginx)
+# ==============================================================================
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. SQL Server Database
+  # ----------------------------------------------------------------------------
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: banking_db
+    restart: unless-stopped
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=${MSSQL_SA_PASSWORD:-YourSecurePassword123!}
+      - MSSQL_PID=Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$${MSSQL_SA_PASSWORD:-YourSecurePassword123!}\" -C -Q \"SELECT 1\" || /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P \"$${MSSQL_SA_PASSWORD:-YourSecurePassword123!}\" -Q \"SELECT 1\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - banking_network
+
+  # ----------------------------------------------------------------------------
+  # 2. ASP.NET Core Web API Backend
+  # ----------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./BankingSystem
+      dockerfile: Dockerfile
+    container_name: banking_api
+    restart: unless-stopped
+    ports:
+      - "5107:5107"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5107
+      - DB_CONNECTION=Server=sqlserver,1433;Database=banking_system_db;User Id=sa;Password=${MSSQL_SA_PASSWORD:-YourSecurePassword123!};TrustServerCertificate=True;MultipleActiveResultSets=true
+      - ConnectionStrings__DefaultConnection=Server=sqlserver,1433;Database=banking_system_db;User Id=sa;Password=${MSSQL_SA_PASSWORD:-YourSecurePassword123!};TrustServerCertificate=True;MultipleActiveResultSets=true
+      - JWT_SECRET=${JWT_SECRET:-EnterpriseBankingSystemUltraSecureSecretKeyForJwt2026!LongEnoughForSha256}
+      - Jwt__SecretKey=${JWT_SECRET:-EnterpriseBankingSystemUltraSecureSecretKeyForJwt2026!LongEnoughForSha256}
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    networks:
+      - banking_network
+
+  # ----------------------------------------------------------------------------
+  # 3. React Frontend Web Application
+  # ----------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ../Banking-frontend
+      dockerfile: Dockerfile
+    container_name: banking_web
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - banking_network
+
+# ------------------------------------------------------------------------------
+# Networks & Persistent Volumes
+# ------------------------------------------------------------------------------
+networks:
+  banking_network:
+    driver: bridge
+
+volumes:
+  sqlserver_data:
+    driver: local
