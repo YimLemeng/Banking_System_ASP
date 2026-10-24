@@ -223,36 +223,6 @@ using (var scope = app.Services.CreateScope())
         {
             await context.Database.EnsureCreatedAsync();
         }
-
-        // Automatic Seeding for Initial Startup (Loaded securely from Environment Variables)
-        if (!await context.Users.AnyAsync())
-        {
-            var adminPassword = Environment.GetEnvironmentVariable("ADMIN_DEFAULT_PASSWORD")
-                                ?? Environment.GetEnvironmentVariable("ADMIN_PASSWORD");
-            var tellerPassword = Environment.GetEnvironmentVariable("TELLER_DEFAULT_PASSWORD")
-                                 ?? Environment.GetEnvironmentVariable("TELLER_PASSWORD");
-
-            if (!string.IsNullOrWhiteSpace(adminPassword) && !string.IsNullOrWhiteSpace(tellerPassword))
-            {
-                logger.LogInformation("Seeding initial administrator and teller accounts from environment configuration...");
-                var passwordHasher = services.GetRequiredService<IPasswordHasher>();
-                var totpService = services.GetRequiredService<ITotpService>();
-
-                var admin = User.Create("admin", passwordHasher.HashPassword(adminPassword), "System Administrator", UserRole.Admin, "admin@bankingsystem.com");
-                admin.EnableTotp(totpService.GenerateSecretKey());
-
-                var teller = User.Create("teller", passwordHasher.HashPassword(tellerPassword), "Branch Head Teller", UserRole.Teller, "teller@bankingsystem.com");
-                teller.EnableTotp(totpService.GenerateSecretKey());
-
-                await context.Users.AddRangeAsync(admin, teller);
-                await context.SaveChangesAsync();
-                logger.LogInformation("Initial accounts seeded successfully.");
-            }
-            else
-            {
-                logger.LogInformation("No initial seed passwords found in environment. Initial database seeding skipped.");
-            }
-        }
     }
     catch (Exception ex)
     {
