@@ -43,14 +43,19 @@ public class PagedResult<T>
 }
 
 public record UserDto(
-    Guid Id,
-    string PhoneNumber,
-    string? Email,
-    string FullName,
-    UserRole Role,
-    UserStatus Status,
-    bool PhoneNumberConfirmed,
-    DateTimeOffset CreatedAt);
+    Guid Id = default,
+    string? Username = null,
+    string? Email = null,
+    string FullName = "",
+    UserRole Role = UserRole.Teller,
+    UserStatus Status = UserStatus.Active,
+    bool TotpEnabled = false,
+    DateTimeOffset CreatedAt = default,
+    string? PhoneNumber = null,
+    bool PhoneNumberConfirmed = false)
+{
+    public UserDto() : this(Guid.Empty, null, null, string.Empty, UserRole.Teller, UserStatus.Active, false, DateTimeOffset.UtcNow, null, false) { }
+}
 
 public record AuthResponseDto(
     string AccessToken,
@@ -59,32 +64,37 @@ public record AuthResponseDto(
     string TokenType,
     UserDto User);
 
-public record RegisterRequestDto(
-    string PhoneNumber,
-    string Password,
-    string FullName,
-    string? Email);
-
-public record LoginPhoneRequestDto(
-    string PhoneNumber,
+public record LoginRequestDto(
+    string Username,
     string Password);
 
-public record LoginPhoneOtpRequestDto(
-    string PhoneNumber,
-    string Code);
+public record TotpSetupResponseDto(
+    string SecretKey,
+    string QrCodeUri,
+    string QrCodeBase64Png);
+
+public record LoginWithTotpRequestDto(
+    string Username,
+    string Password,
+    string TotpCode);
+
+public record LoginPreCheckResponseDto(
+    bool RequiresTotp,
+    bool TotpEnabled,
+    string? TotpSetupQrBase64,   
+    string? TotpSecretKey,       
+    string? TempToken);          
+
+public record RegisterRequestDto(
+    string Username,
+    string Password,
+    string FullName,
+    string? PhoneNumber = null,
+    string? Email = null);
 
 public record LoginEmailRequestDto(
     string Email,
     string Password);
-
-public record RequestOtpDto(
-    string PhoneNumber,
-    OtpPurpose Purpose);
-
-public record VerifyOtpDto(
-    string PhoneNumber,
-    string Code,
-    OtpPurpose Purpose);
 
 public record RefreshTokenRequestDto(
     string RefreshToken);
@@ -93,14 +103,9 @@ public record ChangePasswordRequestDto(
     string CurrentPassword,
     string NewPassword);
 
-public record ResetPasswordRequestDto(
-    string PhoneNumber,
-    string OtpCode,
-    string NewPassword);
-
 public record CustomerDto(
     Guid Id,
-    Guid UserId,
+    Guid? UserId,
     string CustomerNumber,
     string FirstName,
     string LastName,
@@ -110,7 +115,11 @@ public record CustomerDto(
     int KycLevel,
     string Address,
     DateTimeOffset CreatedAt,
-    IReadOnlyList<AccountDto>? Accounts = null);
+    string? PhoneNumber = null,
+    IReadOnlyList<AccountDto>? Accounts = null)
+{
+    public CustomerDto() : this(Guid.Empty, null, string.Empty, string.Empty, string.Empty, default, string.Empty, KycStatus.Pending, 1, string.Empty, DateTimeOffset.UtcNow, null, null) { }
+}
 
 public record CreateCustomerRequestDto(
     Guid? UserId,
@@ -120,6 +129,14 @@ public record CreateCustomerRequestDto(
     DateTime DateOfBirth,
     string NationalIdOrPassport,
     string Address);
+
+public record UpdateCustomerRequestDto(
+    string FirstName,
+    string LastName,
+    DateTime DateOfBirth,
+    string NationalIdOrPassport,
+    string Address,
+    string? PhoneNumber = null);
 
 public record UpdateKycRequestDto(
     KycStatus Status,

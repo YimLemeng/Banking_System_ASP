@@ -18,35 +18,39 @@ public class AuthController : ApiControllerBase
     public async Task<ActionResult<ApiResponse<UserDto>>> Register([FromBody] RegisterRequestDto dto, CancellationToken ct)
     {
         var result = await _authService.RegisterAsync(dto, ct);
-        return Ok(ApiResponse<UserDto>.Ok(result, "Customer registered successfully. Verification OTP dispatched via SMS."));
+        return Ok(ApiResponse<UserDto>.Ok(result, "Account registered successfully."));
     }
 
-    [HttpPost("otp/request")]
-    public async Task<ActionResult<ApiResponse<string>>> RequestOtp([FromBody] RequestOtpDto dto, CancellationToken ct)
+    [HttpPost("login")]
+    public async Task<ActionResult<ApiResponse<AuthResponseDto>>> Login([FromBody] LoginRequestDto dto, CancellationToken ct)
     {
-        var result = await _authService.RequestOtpAsync(dto, ct);
-        return Ok(ApiResponse<string>.Ok(result));
-    }
-
-    [HttpPost("otp/verify")]
-    public async Task<ActionResult<ApiResponse<bool>>> VerifyOtp([FromBody] VerifyOtpDto dto, CancellationToken ct)
-    {
-        var result = await _authService.VerifyOtpAsync(dto, ct);
-        return Ok(ApiResponse<bool>.Ok(result, "OTP verified successfully."));
-    }
-
-    [HttpPost("login/phone")]
-    public async Task<ActionResult<ApiResponse<AuthResponseDto>>> LoginWithPhone([FromBody] LoginPhoneRequestDto dto, CancellationToken ct)
-    {
-        var result = await _authService.LoginWithPhoneAsync(dto, ct);
+        var result = await _authService.LoginAsync(dto, ct);
         return Ok(ApiResponse<AuthResponseDto>.Ok(result, "Authentication successful."));
     }
 
-    [HttpPost("login/phone-otp")]
-    public async Task<ActionResult<ApiResponse<AuthResponseDto>>> LoginWithPhoneOtp([FromBody] LoginPhoneOtpRequestDto dto, CancellationToken ct)
+    [HttpPost("login/pre-check")]
+    public async Task<ActionResult<ApiResponse<LoginPreCheckResponseDto>>> LoginPreCheck([FromBody] LoginRequestDto dto, CancellationToken ct)
     {
-        var result = await _authService.LoginWithPhoneOtpAsync(dto, ct);
-        return Ok(ApiResponse<AuthResponseDto>.Ok(result, "Authentication via OTP successful."));
+        var result = await _authService.LoginPreCheckAsync(dto, ct);
+        return Ok(ApiResponse<LoginPreCheckResponseDto>.Ok(result, "Pre-check completed."));
+    }
+
+    [HttpPost("login/totp")]
+    public async Task<ActionResult<ApiResponse<AuthResponseDto>>> LoginWithTotp([FromBody] LoginWithTotpRequestDto dto, CancellationToken ct)
+    {
+        var result = await _authService.LoginWithTotpAsync(dto, ct);
+        return Ok(ApiResponse<AuthResponseDto>.Ok(result, "TOTP authentication successful."));
+    }
+
+    [HttpPost("totp/setup")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<TotpSetupResponseDto>>> SetupTotp(CancellationToken ct)
+    {
+        var sub = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!Guid.TryParse(sub, out var userId)) return Unauthorized();
+
+        var result = await _authService.SetupTotpAsync(userId, ct);
+        return Ok(ApiResponse<TotpSetupResponseDto>.Ok(result, "TOTP secret configured successfully."));
     }
 
     [HttpPost("login/email")]
@@ -80,12 +84,5 @@ public class AuthController : ApiControllerBase
 
         await _authService.ChangePasswordAsync(userId, dto, ct);
         return Ok(ApiResponse<bool>.Ok(true, "Password changed successfully."));
-    }
-
-    [HttpPost("reset-password")]
-    public async Task<ActionResult<ApiResponse<bool>>> ResetPassword([FromBody] ResetPasswordRequestDto dto, CancellationToken ct)
-    {
-        await _authService.ResetPasswordAsync(dto, ct);
-        return Ok(ApiResponse<bool>.Ok(true, "Password reset successfully."));
     }
 }

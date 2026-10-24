@@ -5,9 +5,10 @@ public class Customer
     private readonly List<Account> _accounts = new();
 
     public Guid Id { get; set; } = Guid.NewGuid();
-    public Guid UserId { get; set; }
-    public User User { get; set; } = null!;
+    public Guid? UserId { get; set; }
+    public User? User { get; set; }
 
+    public string PhoneNumber { get; set; } = string.Empty;
     public string CustomerNumber { get; set; } = string.Empty;
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
@@ -24,13 +25,14 @@ public class Customer
     public IReadOnlyCollection<Account> Accounts => _accounts.AsReadOnly();
 
     public static Customer Create(
-        Guid userId,
+        Guid? userId,
         string customerNumber,
         string firstName,
         string lastName,
         DateTime dateOfBirth,
         string nationalIdOrPassport,
-        string address)
+        string address,
+        string phoneNumber = "")
     {
         return new Customer
         {
@@ -42,6 +44,7 @@ public class Customer
             DateOfBirth = dateOfBirth,
             NationalIdOrPassport = nationalIdOrPassport.Trim(),
             Address = address.Trim(),
+            PhoneNumber = phoneNumber.Trim(),
             KycStatus = KycStatus.Pending,
             KycLevel = 1,
             CreatedAt = DateTimeOffset.UtcNow
@@ -52,5 +55,25 @@ public class Customer
     {
         KycStatus = status;
         KycLevel = level;
+    }
+
+    public void UpdateDetails(
+        string firstName,
+        string lastName,
+        DateTime dateOfBirth,
+        string nationalIdOrPassport,
+        string address,
+        string? phoneNumber = null)
+    {
+        FirstName = firstName.Trim();
+        LastName = lastName.Trim();
+        DateOfBirth = dateOfBirth;
+        NationalIdOrPassport = nationalIdOrPassport.Trim();
+        Address = address.Trim();
+        if (phoneNumber != null)
+        {
+            PhoneNumber = phoneNumber.Trim();
+        }
+        LastModifiedAt = DateTimeOffset.UtcNow;
     }
 }

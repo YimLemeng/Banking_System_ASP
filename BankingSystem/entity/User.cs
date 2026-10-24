@@ -7,8 +7,7 @@ public class User
     private readonly List<RefreshToken> _refreshTokens = new();
 
     public Guid Id { get; set; } = Guid.NewGuid();
-    public PhoneNumber PhoneNumber { get; set; } = null!;
-    public bool PhoneNumberConfirmed { get; set; }
+    public string Username { get; set; } = string.Empty;
     public string? Email { get; set; }
     public bool EmailConfirmed { get; set; }
     public string PasswordHash { get; set; } = string.Empty;
@@ -21,11 +20,14 @@ public class User
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? LastModifiedAt { get; set; }
     public bool IsDeleted { get; set; }
+    
+    public string? TotpSecretKey { get; set; }
+    public bool TotpEnabled { get; set; } = false;
 
     public IReadOnlyCollection<RefreshToken> RefreshTokens => _refreshTokens.AsReadOnly();
 
     public static User Create(
-        PhoneNumber phoneNumber,
+        string username,
         string passwordHash,
         string fullName,
         UserRole role = UserRole.Teller,
@@ -34,8 +36,7 @@ public class User
         return new User
         {
             Id = Guid.NewGuid(),
-            PhoneNumber = phoneNumber,
-            PhoneNumberConfirmed = false,
+            Username = username.Trim().ToLowerInvariant(),
             PasswordHash = passwordHash,
             FullName = fullName.Trim(),
             Role = role,
@@ -45,7 +46,17 @@ public class User
         };
     }
 
-    public void ConfirmPhoneNumber() => PhoneNumberConfirmed = true;
+    public void EnableTotp(string secretKey)
+    {
+        TotpSecretKey = secretKey;
+        TotpEnabled = true;
+    }
+
+    public void DisableTotp()
+    {
+        TotpSecretKey = null;
+        TotpEnabled = false;
+    }
 
     public void ChangePassword(string newPasswordHash)
     {

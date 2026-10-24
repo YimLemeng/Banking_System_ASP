@@ -31,9 +31,8 @@ public class JwtTokenService : IJwtTokenService
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new(ClaimTypes.Name, user.FullName),
-            new(ClaimTypes.MobilePhone, user.PhoneNumber.Value),
-            new(ClaimTypes.Role, user.Role.ToString()),
-            new("phoneNumberConfirmed", user.PhoneNumberConfirmed.ToString())
+            new("username", user.Username),
+            new(ClaimTypes.Role, user.Role.ToString())
         };
 
         if (!string.IsNullOrWhiteSpace(user.Email))

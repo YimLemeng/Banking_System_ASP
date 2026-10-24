@@ -52,4 +52,12 @@ public class CustomersController : ApiControllerBase
         var result = await _customerService.UpdateKycAsync(id, dto, ct);
         return Ok(ApiResponse<CustomerDto>.Ok(result, "Customer KYC updated successfully."));
     }
+
+    [HttpPut("{id:guid}")]
+    [Authorize(Roles = "Admin,Teller")]
+    public async Task<ActionResult<ApiResponse<CustomerDto>>> UpdateCustomer(Guid id, [FromBody] UpdateCustomerRequestDto dto, CancellationToken ct)
+    {
+        var result = await _customerService.UpdateCustomerAsync(id, dto, ct);
+        return Ok(ApiResponse<CustomerDto>.Ok(result, "Customer profile updated successfully."));
+    }
 }

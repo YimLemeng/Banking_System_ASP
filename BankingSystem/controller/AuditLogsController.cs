@@ -8,6 +8,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace BankingSystem.controller;
 
 [Authorize(Roles = "Admin")]
+[Route("api/v1/audit-logs")]
+[Route("api/v1/auditlogs")]
 public class AuditLogsController : ApiControllerBase
 {
     private readonly IAuditLogRepository _auditLogRepository;

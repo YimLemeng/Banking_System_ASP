@@ -3,6 +3,8 @@ using System.Text.Json;
 using BankingSystem.exception;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.SqlClient;
 
 namespace BankingSystem.exception;
 
@@ -80,6 +82,20 @@ public class GlobalExceptionHandlerMiddleware
                     Title = "Conflict",
                     Status = StatusCodes.Status409Conflict,
                     Detail = conflictEx.Message,
+                    Instance = context.Request.Path
+                }),
+
+            DbUpdateException dbEx => (
+                HttpStatusCode.Conflict,
+                new ProblemDetails
+                {
+                    Title = "Database Conflict",
+                    Status = StatusCodes.Status409Conflict,
+                    Detail = dbEx.InnerException != null && (dbEx.InnerException.Message.Contains("IX_Users_PhoneNumber") || dbEx.InnerException.Message.Contains("IX_Customers_PhoneNumber"))
+                        ? "លេខទូរស័ព្ទនេះត្រូវបានប្រើប្រាស់រួចហើយនៅក្នុងប្រព័ន្ធ (This phone number is already registered to another account)."
+                        : (dbEx.InnerException != null && dbEx.InnerException.Message.Contains("IX_")
+                            ? "ទិន្នន័យនេះមានស្ទួនក្នុងប្រព័ន្ធរួចហើយ មិនអាចបញ្ចូលឡើងវិញបានទេ (Duplicate record detected in database)."
+                            : (_env.IsDevelopment() ? dbEx.InnerException?.Message ?? dbEx.Message : "A database constraint violation occurred.")),
                     Instance = context.Request.Path
                 }),
 

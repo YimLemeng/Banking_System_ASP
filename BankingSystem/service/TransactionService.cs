@@ -12,7 +12,6 @@ public class TransactionService : ITransactionService
     private readonly IAccountRepository _accountRepository;
     private readonly ITransactionRepository _transactionRepository;
     private readonly IAuditLogRepository _auditLogRepository;
-    private readonly IOtpService _otpService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUser _currentUser;
     private readonly IMapper _mapper;
@@ -21,7 +20,6 @@ public class TransactionService : ITransactionService
         IAccountRepository accountRepository,
         ITransactionRepository transactionRepository,
         IAuditLogRepository auditLogRepository,
-        IOtpService otpService,
         IUnitOfWork unitOfWork,
         ICurrentUser currentUser,
         IMapper mapper)
@@ -29,7 +27,6 @@ public class TransactionService : ITransactionService
         _accountRepository = accountRepository;
         _transactionRepository = transactionRepository;
         _auditLogRepository = auditLogRepository;
-        _otpService = otpService;
         _unitOfWork = unitOfWork;
         _currentUser = currentUser;
         _mapper = mapper;
@@ -91,21 +88,6 @@ public class TransactionService : ITransactionService
         {
             var existing = await _transactionRepository.GetByIdempotencyKeyAsync(dto.IdempotencyKey, ct);
             if (existing != null) return _mapper.Map<TransactionDto>(existing);
-        }
-
-        // High value 2FA check (>= $1000 USD or >= 4,000,000 KHR)
-        var isHighValue = (dto.Currency == Currency.USD && dto.Amount >= 1000m) ||
-                          (dto.Currency == Currency.KHR && dto.Amount >= 4000000m);
-
-        if (isHighValue || !string.IsNullOrWhiteSpace(dto.OtpCode))
-        {
-            if (string.IsNullOrWhiteSpace(dto.OtpCode))
-                throw new DomainException("2FA OTP code is required for transfers equal to or exceeding 1,000 USD / 4,000,000 KHR.");
-
-            if (string.IsNullOrWhiteSpace(_currentUser.PhoneNumber))
-                throw new UnauthorizedException("User phone number not identified for 2FA validation.");
-
-            await _otpService.VerifyOtpAsync(_currentUser.PhoneNumber, dto.OtpCode, OtpPurpose.TransactionConfirm, ct);
         }
 
         return await _unitOfWork.ExecuteInTransactionAsync(async () =>

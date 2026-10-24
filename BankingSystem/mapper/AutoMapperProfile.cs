@@ -8,9 +8,7 @@ public class AutoMapperProfile : Profile
 {
     public AutoMapperProfile()
     {
-        CreateMap<User, UserDto>()
-            .ForMember(d => d.PhoneNumber, opt => opt.MapFrom(s => s.PhoneNumber.Value));
-
+        CreateMap<User, UserDto>();
         CreateMap<Customer, CustomerDto>();
         CreateMap<Account, AccountDto>();
         CreateMap<Transaction, TransactionDto>();

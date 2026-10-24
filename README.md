@@ -94,5 +94,4 @@ dotnet test
 |---|---|---|---|
 | **Admin** | `012345678` (ឬ `+85512345678`) | `Admin@123!` | System Administrator |
 | **Teller** | `012345679` (ឬ `+85512345679`) | `Teller@123!` | Branch Head Teller |
-| **Customer 1** | `012345680` (ឬ `+85512345680`) | `Customer@123!` | Sophea Chan (USD & KHR accounts) |
-| **Customer 2** | `012345681` (ឬ `+85512345681`) | `Customer@123!` | Vannak Sok (USD account) |
+

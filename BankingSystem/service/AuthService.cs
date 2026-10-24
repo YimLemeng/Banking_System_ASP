@@ -12,8 +12,7 @@ public class AuthService : IAuthService
     private readonly IUserRepository _userRepository;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtTokenService _jwtTokenService;
-    private readonly IOtpService _otpService;
-    private readonly ISmsSender _smsSender;
+    private readonly ITotpService _totpService;
     private readonly IAuditLogRepository _auditLogRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUser _currentUser;
@@ -23,8 +22,7 @@ public class AuthService : IAuthService
         IUserRepository userRepository,
         IPasswordHasher passwordHasher,
         IJwtTokenService jwtTokenService,
-        IOtpService otpService,
-        ISmsSender smsSender,
+        ITotpService totpService,
         IAuditLogRepository auditLogRepository,
         IUnitOfWork unitOfWork,
         ICurrentUser currentUser,
@@ -33,89 +31,22 @@ public class AuthService : IAuthService
         _userRepository = userRepository;
         _passwordHasher = passwordHasher;
         _jwtTokenService = jwtTokenService;
-        _otpService = otpService;
-        _smsSender = smsSender;
+        _totpService = totpService;
         _auditLogRepository = auditLogRepository;
         _unitOfWork = unitOfWork;
         _currentUser = currentUser;
         _mapper = mapper;
     }
 
-    public async Task<UserDto> RegisterAsync(RegisterRequestDto dto, CancellationToken ct = default)
+    public async Task<LoginPreCheckResponseDto> LoginPreCheckAsync(LoginRequestDto dto, CancellationToken ct = default)
     {
-        var phone = PhoneNumber.Create(dto.PhoneNumber);
-        var existing = await _userRepository.GetByPhoneNumberAsync(phone.Value, ct);
-        if (existing != null)
-            throw new ConflictException("A user with this phone number is already registered.");
+        var username = dto.Username.Trim();
+        var user = await _userRepository.GetByUsernameAsync(username, ct);
 
-        if (!string.IsNullOrWhiteSpace(dto.Email))
-        {
-            var existingEmail = await _userRepository.GetByEmailAsync(dto.Email.Trim().ToLowerInvariant(), ct);
-            if (existingEmail != null)
-                throw new ConflictException("A user with this email address is already registered.");
-        }
-
-        var user = User.Create(phone, _passwordHasher.HashPassword(dto.Password), dto.FullName, UserRole.Teller, dto.Email);
-        await _userRepository.AddAsync(user, ct);
-
-        var code = await _otpService.GenerateOtpAsync(phone.Value, OtpPurpose.Register, ct);
-        await _smsSender.SendSmsAsync(phone.Value, $"Your Banking verification code is: {code}. Valid for 5 minutes.", ct);
-
-        await _auditLogRepository.AddAsync(AuditLog.Create(
-            AuditAction.Register, nameof(User), $"User registered with phone {phone.Mask()}",
-            userId: user.Id, maskedPhoneNumber: phone.Mask(), entityId: user.Id.ToString()), ct);
-
-        await _unitOfWork.SaveChangesAsync(ct);
-        return _mapper.Map<UserDto>(user);
-    }
-
-    public async Task<string> RequestOtpAsync(RequestOtpDto dto, CancellationToken ct = default)
-    {
-        var normalized = PhoneNumber.Normalize(dto.PhoneNumber);
-        var masked = _otpService.MaskPhoneNumber(normalized);
-
-        var code = await _otpService.GenerateOtpAsync(normalized, dto.Purpose, ct);
-        await _smsSender.SendSmsAsync(normalized, $"Your verification code is: {code}. Valid for 5 minutes.", ct);
-
-        await _auditLogRepository.AddAsync(AuditLog.Create(
-            AuditAction.OtpRequested, "OtpCode", $"OTP requested for {dto.Purpose}",
-            userId: _currentUser.UserId, maskedPhoneNumber: masked, ipAddress: _currentUser.IpAddress, userAgent: _currentUser.UserAgent), ct);
-
-        await _unitOfWork.SaveChangesAsync(ct);
-        return $"Verification code sent to {masked}. (Demo OTP: {code} or 123456)";
-    }
-
-    public async Task<bool> VerifyOtpAsync(VerifyOtpDto dto, CancellationToken ct = default)
-    {
-        var normalized = PhoneNumber.Normalize(dto.PhoneNumber);
-        await _otpService.VerifyOtpAsync(normalized, dto.Code, dto.Purpose, ct);
-
-        if (dto.Purpose == OtpPurpose.Register)
-        {
-            var user = await _userRepository.GetByPhoneNumberAsync(normalized, ct);
-            if (user != null)
-            {
-                user.ConfirmPhoneNumber();
-                _userRepository.Update(user);
-            }
-        }
-
-        await _auditLogRepository.AddAsync(AuditLog.Create(
-            AuditAction.OtpVerified, "OtpCode", $"OTP verified for {dto.Purpose}",
-            userId: _currentUser.UserId, maskedPhoneNumber: _otpService.MaskPhoneNumber(normalized), ipAddress: _currentUser.IpAddress), ct);
-
-        await _unitOfWork.SaveChangesAsync(ct);
-        return true;
-    }
-
-    public async Task<AuthResponseDto> LoginWithPhoneAsync(LoginPhoneRequestDto dto, CancellationToken ct = default)
-    {
-        var normalized = PhoneNumber.Normalize(dto.PhoneNumber);
-        var user = await _userRepository.GetByPhoneNumberAsync(normalized, ct);
         var now = DateTimeOffset.UtcNow;
 
         if (user == null)
-            throw new UnauthorizedException("Invalid phone number or password.");
+            throw new UnauthorizedException("Invalid username or password.");
 
         if (user.IsLockedOut(now))
             throw new UnauthorizedException($"Account is temporarily locked. Try again in {Math.Ceiling((user.LockoutEnd!.Value - now).TotalMinutes)} minutes.");
@@ -125,7 +56,65 @@ public class AuthService : IAuthService
             user.RecordLoginFailure(now);
             _userRepository.Update(user);
             await _unitOfWork.SaveChangesAsync(ct);
-            throw new UnauthorizedException("Invalid phone number or password.");
+            throw new UnauthorizedException("Invalid username or password.");
+        }
+
+        string secretKey = user.TotpSecretKey ?? _totpService.GenerateSecretKey();
+        if (string.IsNullOrEmpty(user.TotpSecretKey))
+        {
+            user.TotpSecretKey = secretKey;
+            _userRepository.Update(user);
+            await _unitOfWork.SaveChangesAsync(ct);
+        }
+
+        var qrUri = _totpService.GetQrCodeUri(secretKey, user.Username, "TrustBank");
+        var qrBase64 = _totpService.GetQrCodeBase64Png(qrUri);
+
+        return new LoginPreCheckResponseDto(
+            RequiresTotp: true,
+            TotpEnabled: user.TotpEnabled,
+            TotpSetupQrBase64: qrBase64,
+            TotpSecretKey: secretKey,
+            TempToken: null
+        );
+    }
+
+    public async Task<AuthResponseDto> LoginWithTotpAsync(LoginWithTotpRequestDto dto, CancellationToken ct = default)
+    {
+        var username = dto.Username.Trim();
+        var user = await _userRepository.GetByUsernameAsync(username, ct);
+
+        var now = DateTimeOffset.UtcNow;
+
+        if (user == null)
+            throw new UnauthorizedException("Invalid username or password.");
+
+        if (user.IsLockedOut(now))
+            throw new UnauthorizedException($"Account is temporarily locked. Try again in {Math.Ceiling((user.LockoutEnd!.Value - now).TotalMinutes)} minutes.");
+
+        if (!_passwordHasher.VerifyPassword(dto.Password, user.PasswordHash))
+        {
+            user.RecordLoginFailure(now);
+            _userRepository.Update(user);
+            await _unitOfWork.SaveChangesAsync(ct);
+            throw new UnauthorizedException("Invalid username or password.");
+        }
+
+        if (string.IsNullOrEmpty(user.TotpSecretKey))
+            throw new AppException("2FA Authenticator has not been initialized. Please try logging in again.");
+
+        var isValidCode = _totpService.ValidateCode(user.TotpSecretKey, dto.TotpCode);
+        if (!isValidCode)
+        {
+            user.RecordLoginFailure(now);
+            _userRepository.Update(user);
+            await _unitOfWork.SaveChangesAsync(ct);
+            throw new UnauthorizedException("Invalid 6-digit Authenticator code. Please check your Authenticator app and try again.");
+        }
+
+        if (!user.TotpEnabled)
+        {
+            user.TotpEnabled = true;
         }
 
         user.RecordLoginSuccess();
@@ -135,40 +124,87 @@ public class AuthService : IAuthService
         _userRepository.Update(user);
 
         await _auditLogRepository.AddAsync(AuditLog.Create(
-            AuditAction.LoginSuccess, nameof(User), "Login success (Phone + Password)",
-            userId: user.Id, maskedPhoneNumber: user.PhoneNumber.Mask(), ipAddress: _currentUser.IpAddress), ct);
+            AuditAction.LoginSuccess, nameof(User), $"Login success via TOTP Authenticator (Username: {user.Username})",
+            userId: user.Id, maskedPhoneNumber: null, ipAddress: _currentUser.IpAddress), ct);
 
         await _unitOfWork.SaveChangesAsync(ct);
         return new AuthResponseDto(accessToken, refreshToken, _jwtTokenService.AccessTokenExpirationMinutes * 60, "Bearer", _mapper.Map<UserDto>(user));
     }
 
-    public async Task<AuthResponseDto> LoginWithPhoneOtpAsync(LoginPhoneOtpRequestDto dto, CancellationToken ct = default)
+    public async Task<TotpSetupResponseDto> SetupTotpAsync(Guid userId, CancellationToken ct = default)
     {
-        var normalized = PhoneNumber.Normalize(dto.PhoneNumber);
-        await _otpService.VerifyOtpAsync(normalized, dto.Code, OtpPurpose.Login, ct);
+        var user = await _userRepository.GetByIdAsync(userId, ct);
+        if (user == null) throw new NotFoundException($"User {userId} was not found.");
 
-        var user = await _userRepository.GetByPhoneNumberAsync(normalized, ct);
-        if (user == null)
-            throw new NotFoundException("No account found with this phone number.");
+        var secret = _totpService.GenerateSecretKey();
+        user.TotpSecretKey = secret;
+        _userRepository.Update(user);
+        await _unitOfWork.SaveChangesAsync(ct);
+
+        var qrUri = _totpService.GetQrCodeUri(secret, user.Username, "TrustBank");
+        var qrBase64 = _totpService.GetQrCodeBase64Png(qrUri);
+
+        return new TotpSetupResponseDto(secret, qrUri, qrBase64);
+    }
+
+    public async Task<AuthResponseDto> LoginAsync(LoginRequestDto dto, CancellationToken ct = default)
+    {
+        var username = dto.Username.Trim();
+        var user = await _userRepository.GetByUsernameAsync(username, ct);
 
         var now = DateTimeOffset.UtcNow;
+
+        if (user == null)
+            throw new UnauthorizedException("Invalid username or password.");
+
         if (user.IsLockedOut(now))
-            throw new UnauthorizedException("Account is currently locked out.");
+            throw new UnauthorizedException($"Account is temporarily locked. Try again in {Math.Ceiling((user.LockoutEnd!.Value - now).TotalMinutes)} minutes.");
+
+        if (!_passwordHasher.VerifyPassword(dto.Password, user.PasswordHash))
+        {
+            user.RecordLoginFailure(now);
+            _userRepository.Update(user);
+            await _unitOfWork.SaveChangesAsync(ct);
+            throw new UnauthorizedException("Invalid username or password.");
+        }
 
         user.RecordLoginSuccess();
-        user.ConfirmPhoneNumber();
-
         var accessToken = _jwtTokenService.GenerateAccessToken(user);
         var refreshToken = _jwtTokenService.GenerateRefreshToken();
         user.AddRefreshToken(refreshToken, now.AddDays(7), _currentUser.IpAddress);
         _userRepository.Update(user);
 
         await _auditLogRepository.AddAsync(AuditLog.Create(
-            AuditAction.LoginSuccess, nameof(User), "Passwordless Login success (Phone + OTP)",
-            userId: user.Id, maskedPhoneNumber: user.PhoneNumber.Mask(), ipAddress: _currentUser.IpAddress), ct);
+            AuditAction.LoginSuccess, nameof(User), $"Login success (Username: {user.Username})",
+            userId: user.Id, maskedPhoneNumber: null, ipAddress: _currentUser.IpAddress), ct);
 
         await _unitOfWork.SaveChangesAsync(ct);
         return new AuthResponseDto(accessToken, refreshToken, _jwtTokenService.AccessTokenExpirationMinutes * 60, "Bearer", _mapper.Map<UserDto>(user));
+    }
+
+    public async Task<UserDto> RegisterAsync(RegisterRequestDto dto, CancellationToken ct = default)
+    {
+        var username = dto.Username.Trim().ToLowerInvariant();
+        var existingUsername = await _userRepository.GetByUsernameAsync(username, ct);
+        if (existingUsername != null)
+            throw new ConflictException("A user with this username is already registered.");
+
+        if (!string.IsNullOrWhiteSpace(dto.Email))
+        {
+            var existingEmail = await _userRepository.GetByEmailAsync(dto.Email.Trim().ToLowerInvariant(), ct);
+            if (existingEmail != null)
+                throw new ConflictException("A user with this email address is already registered.");
+        }
+
+        var user = User.Create(username, _passwordHasher.HashPassword(dto.Password), dto.FullName, UserRole.Teller, dto.Email);
+        await _userRepository.AddAsync(user, ct);
+
+        await _auditLogRepository.AddAsync(AuditLog.Create(
+            AuditAction.Register, nameof(User), $"User registered with username {username}",
+            userId: user.Id, maskedPhoneNumber: null, entityId: user.Id.ToString()), ct);
+
+        await _unitOfWork.SaveChangesAsync(ct);
+        return _mapper.Map<UserDto>(user);
     }
 
     public async Task<AuthResponseDto> LoginWithEmailAsync(LoginEmailRequestDto dto, CancellationToken ct = default)
@@ -246,27 +282,7 @@ public class AuthService : IAuthService
 
         await _auditLogRepository.AddAsync(AuditLog.Create(
             AuditAction.PasswordChanged, nameof(User), "Password changed successfully",
-            userId: user.Id, maskedPhoneNumber: user.PhoneNumber.Mask(), ipAddress: _currentUser.IpAddress), ct);
-
-        await _unitOfWork.SaveChangesAsync(ct);
-    }
-
-    public async Task ResetPasswordAsync(ResetPasswordRequestDto dto, CancellationToken ct = default)
-    {
-        var normalized = PhoneNumber.Normalize(dto.PhoneNumber);
-        await _otpService.VerifyOtpAsync(normalized, dto.OtpCode, OtpPurpose.ResetPassword, ct);
-
-        var user = await _userRepository.GetByPhoneNumberAsync(normalized, ct);
-        if (user == null) throw new NotFoundException("User not found.");
-
-        user.ChangePassword(_passwordHasher.HashPassword(dto.NewPassword));
-        user.Unlock();
-        user.RevokeAllRefreshTokens(_currentUser.IpAddress);
-        _userRepository.Update(user);
-
-        await _auditLogRepository.AddAsync(AuditLog.Create(
-            AuditAction.PasswordReset, nameof(User), "Password reset via OTP",
-            userId: user.Id, maskedPhoneNumber: user.PhoneNumber.Mask(), ipAddress: _currentUser.IpAddress), ct);
+            userId: user.Id, maskedPhoneNumber: null, ipAddress: _currentUser.IpAddress), ct);
 
         await _unitOfWork.SaveChangesAsync(ct);
     }

@@ -6,8 +6,7 @@ namespace BankingSystem.entity;
 public sealed class PhoneNumber : IEquatable<PhoneNumber>
 {
     private static readonly Regex E164Regex = new(@"^\+[1-9]\d{6,14}$", RegexOptions.Compiled);
-    private const string DefaultCountryCode = "+855"; // Cambodia
-
+    private const string DefaultCountryCode = "+855"; 
     public string Value { get; }
 
     public PhoneNumber()

@@ -12,7 +12,6 @@ public class AppDbContext : DbContext
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<Transaction> Transactions => Set<Transaction>();
-    public DbSet<OtpCode> OtpCodes => Set<OtpCode>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<IdempotentRequest> IdempotentRequests => Set<IdempotentRequest>();
 
@@ -25,12 +24,10 @@ public class AppDbContext : DbContext
         {
             builder.ToTable("Users");
             builder.HasKey(u => u.Id);
-            builder.Property(u => u.PhoneNumber)
-                .HasConversion(p => p.Value, v => PhoneNumber.Create(v, "+855"))
-                .HasMaxLength(20).IsRequired();
-            builder.HasIndex(u => u.PhoneNumber).IsUnique();
+            builder.Property(u => u.Username).HasMaxLength(50);
             builder.Property(u => u.FullName).HasMaxLength(150).IsRequired();
             builder.Property(u => u.PasswordHash).HasMaxLength(500).IsRequired();
+            builder.Property(u => u.TotpSecretKey).HasMaxLength(256);
             builder.HasMany(u => u.RefreshTokens).WithOne().HasForeignKey(r => r.UserId).OnDelete(DeleteBehavior.Cascade);
             builder.HasQueryFilter(u => !u.IsDeleted);
         });
@@ -52,7 +49,9 @@ public class AppDbContext : DbContext
             builder.HasKey(c => c.Id);
             builder.Property(c => c.CustomerNumber).HasMaxLength(50).IsRequired();
             builder.HasIndex(c => c.CustomerNumber).IsUnique();
-            builder.HasOne(c => c.User).WithOne().HasForeignKey<Customer>(c => c.UserId).OnDelete(DeleteBehavior.Restrict);
+            builder.Property(c => c.PhoneNumber).HasMaxLength(20);
+            builder.HasIndex(c => c.PhoneNumber);
+            builder.HasOne(c => c.User).WithOne().HasForeignKey<Customer>(c => c.UserId).IsRequired(false).OnDelete(DeleteBehavior.Restrict);
             builder.HasMany(c => c.Accounts).WithOne(a => a.Customer).HasForeignKey(a => a.CustomerId).OnDelete(DeleteBehavior.Restrict);
             builder.HasQueryFilter(c => !c.IsDeleted);
         });
@@ -83,16 +82,6 @@ public class AppDbContext : DbContext
             builder.HasIndex(t => t.IdempotencyKey);
             builder.HasIndex(t => new { t.AccountId, t.CreatedAt });
             builder.HasQueryFilter(t => !t.Account.IsDeleted);
-        });
-
-        // OtpCode
-        modelBuilder.Entity<OtpCode>(builder =>
-        {
-            builder.ToTable("OtpCodes");
-            builder.HasKey(o => o.Id);
-            builder.Property(o => o.PhoneNumber).HasMaxLength(20).IsRequired();
-            builder.Property(o => o.CodeHash).HasMaxLength(256).IsRequired();
-            builder.HasIndex(o => new { o.PhoneNumber, o.Purpose, o.ExpiresAt });
         });
 
         // AuditLog

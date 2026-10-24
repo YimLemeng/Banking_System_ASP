@@ -78,17 +78,15 @@ builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
 
 // Security Services
 builder.Services.AddSingleton<IPasswordHasher, PasswordHasher>();
+builder.Services.AddSingleton<ITotpService, TotpService>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
-builder.Services.AddScoped<IOtpService, OtpService>();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 
 // Application Services
-builder.Services.AddScoped<ISmsSender, SmsSender>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<ITransactionService, TransactionService>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
-builder.Services.AddHostedService<OtpCleanupService>();
 
 // JWT Authentication
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();

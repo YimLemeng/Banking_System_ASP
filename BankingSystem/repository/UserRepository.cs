@@ -8,13 +8,11 @@ public class UserRepository : GenericRepository<User, Guid>, IUserRepository
 {
     public UserRepository(AppDbContext context) : base(context) { }
 
-    public async Task<User?> GetByPhoneNumberAsync(string phoneNumber, CancellationToken cancellationToken = default)
+    public async Task<User?> GetByUsernameAsync(string username, CancellationToken cancellationToken = default)
     {
-        if (!PhoneNumber.TryCreate(phoneNumber, out var phoneObj) || phoneObj is null)
-            return null;
-
+        var normalized = username.Trim().ToLowerInvariant();
         return await DbSet.Include(u => u.RefreshTokens)
-            .FirstOrDefaultAsync(u => u.PhoneNumber == phoneObj, cancellationToken);
+            .FirstOrDefaultAsync(u => u.Username.ToLower() == normalized, cancellationToken);
     }
 
     public async Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)

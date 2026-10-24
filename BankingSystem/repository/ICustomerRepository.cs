@@ -6,4 +6,6 @@ public interface ICustomerRepository : IRepository<Customer, Guid>
 {
     Task<Customer?> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
     Task<Customer?> GetByIdWithAccountsAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Customer>> GetAllWithAccountsAsync(CancellationToken cancellationToken = default);
+    Task<Customer?> GetByPhoneNumberAsync(string phoneNumber, CancellationToken cancellationToken = default);
 }

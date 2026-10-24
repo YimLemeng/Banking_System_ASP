@@ -1,4 +1,3 @@
 <Solution>
-  <Project Path="BankingSystem.Tests/BankingSystem.Tests.csproj" />
   <Project Path="BankingSystem/BankingSystem.csproj" />
 </Solution>
