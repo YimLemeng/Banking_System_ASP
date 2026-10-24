@@ -14,12 +14,46 @@ namespace BankingSystem.config.Migrations
             migrationBuilder.Sql("IF OBJECT_ID('dbo.OtpCodes', 'U') IS NOT NULL DROP TABLE [dbo].[OtpCodes];");
             migrationBuilder.Sql("IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Users_PhoneNumber' AND object_id = OBJECT_ID('dbo.Users')) DROP INDEX [IX_Users_PhoneNumber] ON [dbo].[Users];");
             migrationBuilder.Sql("IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Customers_UserId' AND object_id = OBJECT_ID('dbo.Customers')) DROP INDEX [IX_Customers_UserId] ON [dbo].[Customers];");
-            migrationBuilder.Sql("IF EXISTS (SELECT 1 FROM sys.columns WHERE name = 'PhoneNumber' AND object_id = OBJECT_ID('dbo.Users')) ALTER TABLE [dbo].[Users] DROP COLUMN [PhoneNumber];");
+            migrationBuilder.Sql(@"
+                DECLARE @defConstraint NVARCHAR(200);
+                SELECT @defConstraint = d.name
+                FROM sys.default_constraints d
+                JOIN sys.columns c ON d.parent_column_id = c.column_id AND d.parent_object_id = c.object_id
+                WHERE c.name = 'PhoneNumber' AND d.parent_object_id = OBJECT_ID('dbo.Users');
+
+                IF @defConstraint IS NOT NULL
+                BEGIN
+                    EXEC('ALTER TABLE [dbo].[Users] DROP CONSTRAINT [' + @defConstraint + ']');
+                END
+
+                IF EXISTS (SELECT 1 FROM sys.columns WHERE name = 'PhoneNumber' AND object_id = OBJECT_ID('dbo.Users'))
+                BEGIN
+                    ALTER TABLE [dbo].[Users] DROP COLUMN [PhoneNumber];
+                END
+            ");
 
             migrationBuilder.Sql(@"
                 IF EXISTS (SELECT 1 FROM sys.columns WHERE name = 'PhoneNumberConfirmed' AND object_id = OBJECT_ID('dbo.Users'))
                 BEGIN
-                    EXEC sp_rename 'dbo.Users.PhoneNumberConfirmed', 'TotpEnabled', 'COLUMN';
+                    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE name = 'TotpEnabled' AND object_id = OBJECT_ID('dbo.Users'))
+                    BEGIN
+                        EXEC sp_rename 'dbo.Users.PhoneNumberConfirmed', 'TotpEnabled', 'COLUMN';
+                    END
+                    ELSE
+                    BEGIN
+                        DECLARE @defConfirmed NVARCHAR(200);
+                        SELECT @defConfirmed = d.name
+                        FROM sys.default_constraints d
+                        JOIN sys.columns c ON d.parent_column_id = c.column_id AND d.parent_object_id = c.object_id
+                        WHERE c.name = 'PhoneNumberConfirmed' AND d.parent_object_id = OBJECT_ID('dbo.Users');
+
+                        IF @defConfirmed IS NOT NULL
+                        BEGIN
+                            EXEC('ALTER TABLE [dbo].[Users] DROP CONSTRAINT [' + @defConfirmed + ']');
+                        END
+
+                        ALTER TABLE [dbo].[Users] DROP COLUMN [PhoneNumberConfirmed];
+                    END
                 END
                 ELSE IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE name = 'TotpEnabled' AND object_id = OBJECT_ID('dbo.Users'))
                 BEGIN
