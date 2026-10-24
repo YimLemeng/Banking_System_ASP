@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -11,78 +11,63 @@ namespace BankingSystem.config.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(
-                name: "OtpCodes");
+            migrationBuilder.Sql("IF OBJECT_ID('dbo.OtpCodes', 'U') IS NOT NULL DROP TABLE [dbo].[OtpCodes];");
+            migrationBuilder.Sql("IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Users_PhoneNumber' AND object_id = OBJECT_ID('dbo.Users')) DROP INDEX [IX_Users_PhoneNumber] ON [dbo].[Users];");
+            migrationBuilder.Sql("IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Customers_UserId' AND object_id = OBJECT_ID('dbo.Customers')) DROP INDEX [IX_Customers_UserId] ON [dbo].[Customers];");
+            migrationBuilder.Sql("IF EXISTS (SELECT 1 FROM sys.columns WHERE name = 'PhoneNumber' AND object_id = OBJECT_ID('dbo.Users')) ALTER TABLE [dbo].[Users] DROP COLUMN [PhoneNumber];");
 
-            migrationBuilder.DropIndex(
-                name: "IX_Users_PhoneNumber",
-                table: "Users");
+            migrationBuilder.Sql(@"
+                IF EXISTS (SELECT 1 FROM sys.columns WHERE name = 'PhoneNumberConfirmed' AND object_id = OBJECT_ID('dbo.Users'))
+                BEGIN
+                    EXEC sp_rename 'dbo.Users.PhoneNumberConfirmed', 'TotpEnabled', 'COLUMN';
+                END
+                ELSE IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE name = 'TotpEnabled' AND object_id = OBJECT_ID('dbo.Users'))
+                BEGIN
+                    ALTER TABLE [dbo].[Users] ADD [TotpEnabled] bit NOT NULL DEFAULT 0;
+                END
+            ");
 
-            migrationBuilder.DropIndex(
-                name: "IX_Customers_UserId",
-                table: "Customers");
+            migrationBuilder.Sql(@"
+                IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE name = 'TotpSecretKey' AND object_id = OBJECT_ID('dbo.Users'))
+                BEGIN
+                    ALTER TABLE [dbo].[Users] ADD [TotpSecretKey] nvarchar(256) NULL;
+                END
+            ");
 
-            migrationBuilder.DropColumn(
-                name: "PhoneNumber",
-                table: "Users");
+            migrationBuilder.Sql(@"
+                IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE name = 'Username' AND object_id = OBJECT_ID('dbo.Users'))
+                BEGIN
+                    ALTER TABLE [dbo].[Users] ADD [Username] nvarchar(50) NOT NULL DEFAULT '';
+                END
+            ");
 
-            migrationBuilder.RenameColumn(
-                name: "PhoneNumberConfirmed",
-                table: "Users",
-                newName: "TotpEnabled");
+            migrationBuilder.Sql(@"
+                IF EXISTS (SELECT 1 FROM sys.columns WHERE name = 'UserId' AND object_id = OBJECT_ID('dbo.Customers'))
+                BEGIN
+                    ALTER TABLE [dbo].[Customers] ALTER COLUMN [UserId] uniqueidentifier NULL;
+                END
+            ");
 
-            migrationBuilder.AddColumn<string>(
-                name: "TotpSecretKey",
-                table: "Users",
-                type: "nvarchar(256)",
-                maxLength: 256,
-                nullable: true);
+            migrationBuilder.Sql(@"
+                IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE name = 'PhoneNumber' AND object_id = OBJECT_ID('dbo.Customers'))
+                BEGIN
+                    ALTER TABLE [dbo].[Customers] ADD [PhoneNumber] nvarchar(20) NOT NULL DEFAULT '';
+                END
+            ");
 
-            migrationBuilder.AddColumn<string>(
-                name: "Username",
-                table: "Users",
-                type: "nvarchar(50)",
-                maxLength: 50,
-                nullable: false,
-                defaultValue: "");
+            migrationBuilder.Sql(@"
+                IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Customers_PhoneNumber' AND object_id = OBJECT_ID('dbo.Customers'))
+                BEGIN
+                    CREATE INDEX [IX_Customers_PhoneNumber] ON [dbo].[Customers] ([PhoneNumber]);
+                END
+            ");
 
-            migrationBuilder.AlterColumn<Guid>(
-                name: "UserId",
-                table: "Customers",
-                type: "uniqueidentifier",
-                nullable: true,
-                oldClrType: typeof(Guid),
-                oldType: "uniqueidentifier");
-
-            migrationBuilder.AddColumn<string>(
-                name: "PhoneNumber",
-                table: "Customers",
-                type: "nvarchar(20)",
-                maxLength: 20,
-                nullable: false,
-                defaultValue: "");
-
-            migrationBuilder.AlterColumn<decimal>(
-                name: "InterestRate",
-                table: "Accounts",
-                type: "decimal(5,2)",
-                precision: 5,
-                scale: 2,
-                nullable: false,
-                oldClrType: typeof(decimal),
-                oldType: "decimal(18,2)");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Customers_PhoneNumber",
-                table: "Customers",
-                column: "PhoneNumber");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Customers_UserId",
-                table: "Customers",
-                column: "UserId",
-                unique: true,
-                filter: "[UserId] IS NOT NULL");
+            migrationBuilder.Sql(@"
+                IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Customers_UserId' AND object_id = OBJECT_ID('dbo.Customers'))
+                BEGIN
+                    CREATE UNIQUE INDEX [IX_Customers_UserId] ON [dbo].[Customers] ([UserId]) WHERE [UserId] IS NOT NULL;
+                END
+            ");
         }
 
         /// <inheritdoc />

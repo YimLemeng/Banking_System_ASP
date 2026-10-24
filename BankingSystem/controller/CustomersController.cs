@@ -39,10 +39,10 @@ public class CustomersController : ApiControllerBase
     }
 
     [HttpGet("user/{userId:guid}")]
-    public async Task<ActionResult<ApiResponse<CustomerDto>>> GetByUserId(Guid userId, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<CustomerDto?>>> GetByUserId(Guid userId, CancellationToken ct)
     {
         var result = await _customerService.GetByUserIdAsync(userId, ct);
-        return Ok(ApiResponse<CustomerDto>.Ok(result));
+        return Ok(ApiResponse<CustomerDto?>.Ok(result));
     }
 
     [HttpPut("{id:guid}/kyc")]

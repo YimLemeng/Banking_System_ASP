@@ -96,10 +96,10 @@ public class CustomerService : ICustomerService
         return _mapper.Map<IReadOnlyList<CustomerDto>>(customers);
     }
 
-    public async Task<CustomerDto> GetByUserIdAsync(Guid userId, CancellationToken ct = default)
+    public async Task<CustomerDto?> GetByUserIdAsync(Guid userId, CancellationToken ct = default)
     {
         var c = await _customerRepository.GetByUserIdAsync(userId, ct);
-        if (c == null) throw new NotFoundException("Customer profile not found.");
+        if (c == null) return null;
         return _mapper.Map<CustomerDto>(c);
     }
 
